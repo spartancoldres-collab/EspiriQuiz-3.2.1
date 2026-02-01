@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>EspiriQuiz v3.2 Complete</title>
+<title>EspiriQuiz v3.2 Final</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -43,6 +43,11 @@ body{background:radial-gradient(circle at top,#1a1a2e,#0f0f1e,#000);color:#e2e8f
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useEffect,useRef}=React
+
+// ========== CONFIGURE SUA CHAVE API AQUI ==========
+const GEMINI_API_KEY = 'AIzaSyD7Y1643CJQ-h0iMj1_MJ6JLeBXVqXtnhg'
+// Obtenha em: https://makersuite.google.com/app/apikey
+// ===================================================
 
 const GEMINI_API_URL='https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent'
 
@@ -91,7 +96,6 @@ const[missions,setMissions]=useState([])
 const[blitzMode,setBlitzMode]=useState(false)
 const[blitzTimer,setBlitzTimer]=useState(10)
 
-const[apiKey,setApiKey]=useState(localStorage.getItem('gemini-api-key')||'')
 const[aiMentorTip,setAiMentorTip]=useState(null)
 const[aiDeepDive,setAiDeepDive]=useState(null)
 const[loadingAI,setLoadingAI]=useState(false)
@@ -123,11 +127,11 @@ return()=>clearInterval(t)
 },[blitzMode,view,selectedAnswer])
 
 async function callGeminiAPI(prompt){
-if(!apiKey){
-return "⚠️ Configure sua chave API nas Configurações.\n\nObtenha grátis em: https://makersuite.google.com/app/apikey"
+if(GEMINI_API_KEY==='SUA_CHAVE_API_AQUI'){
+return "⚠️ Configure a chave API no código HTML (linha 45).\n\nObtenha grátis em: https://makersuite.google.com/app/apikey"
 }
 try{
-const response=await fetch(`${GEMINI_API_URL}?key=${apiKey}`,{
+const response=await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,{
 method:'POST',
 headers:{'Content-Type':'application/json'},
 body:JSON.stringify({
@@ -218,9 +222,16 @@ localStorage.setItem('espiriquiz-game',JSON.stringify({...current,...data,xp,lev
 }
 
 function start(mode){
-const filtered=selectedChapter==="Todos"?bank:bank.filter(q=>q.chapter?.includes(selectedChapter))
+let filtered=bank
+if(selectedChapter!=="Todos"){
+filtered=bank.filter(q=>q.chapter&&q.chapter.includes(selectedChapter))
+}
+if(filtered.length===0){
+alert('⚠️ Nenhuma pergunta encontrada para este capítulo!')
+filtered=bank
+}
 const num=mode==='blitz'?20:difficulty==="easy"?10:difficulty==="hard"?20:15
-const sel=[...filtered].sort(()=>Math.random()-.5).slice(0,num)
+const sel=[...filtered].sort(()=>Math.random()-.5).slice(0,Math.min(num,filtered.length))
 setQuestions(sel)
 setIdx(0)
 setScore(0)
@@ -242,12 +253,13 @@ const pts=difficulty==="easy"?500:difficulty==="hard"?2000:1000
 setScore(s=>s+pts)
 gainXP(50)
 if(blitzMode)gainXP(blitzTimer*5)
-setTimeout(next,1500)
+// NÃO avança automaticamente - aguarda botão "Próxima"
 }else{
 if(studyMode){
-setTimeout(()=>{setFeedback(null);setSelectedAnswer(null)},2000)
+// No modo estudo, também não avança automaticamente
 }else{
-setTimeout(endGame,1500)
+// Modo normal: erro = fim do jogo após 2 segundos
+setTimeout(endGame,2000)
 }
 }
 }
@@ -280,67 +292,13 @@ if(xp>=15000)unlockBadge('xp15k')
 setView("end")
 }
 
-if(view==="settings")return(
-<div className="min-h-screen p-6 flex items-center justify-center">
-<div className="sound-control bg-slate-800/80 p-3 rounded-full cursor-pointer" onClick={()=>setSoundEnabled(!soundEnabled)}>
-{soundEnabled?'🔊':'🔇'}
-</div>
-<div className="max-w-md w-full bg-slate-900/50 p-6 rounded-xl card-glow">
-<h2 className="text-3xl font-bold glow-text mb-6 text-center">⚙️ Configurações</h2>
-<div className="mb-6">
-<label className="block text-sm font-semibold text-purple-300 mb-2">🤖 Chave API Gemini</label>
-<input
-type="text"
-value={apiKey}
-onChange={(e)=>{
-setApiKey(e.target.value)
-localStorage.setItem('gemini-api-key',e.target.value)
-}}
-placeholder="Cole sua chave API aqui"
-className="w-full bg-slate-800 border border-purple-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
-/>
-<p className="text-xs text-slate-400 mt-2">
-Obtenha grátis: <a href="https://makersuite.google.com/app/apikey" target="_blank" className="text-purple-400 underline">makersuite.google.com</a>
-</p>
-{apiKey&&(
-<div className="mt-3 p-3 bg-green-600/20 border border-green-500/30 rounded-xl">
-<div className="text-green-300 text-sm font-semibold">✓ Chave configurada</div>
-<div className="text-green-400 text-xs mt-1">IA disponível: Dica + Aprofundamento</div>
-</div>
-)}
-{!apiKey&&(
-<div className="mt-3 p-3 bg-yellow-600/20 border border-yellow-500/30 rounded-xl">
-<div className="text-yellow-300 text-sm font-semibold">⚠️ Chave não configurada</div>
-</div>
-)}
-</div>
-<div className="space-y-3">
-<button onClick={()=>{
-if(apiKey)alert('✅ Salvo! Use:\n🧠 Dica do Mentor\n📚 Aprofundamento')
-else alert('⚠️ Cole sua chave primeiro')
-}} className="btn-primary px-6 py-3 rounded-xl font-semibold w-full">💾 Salvar</button>
-<button onClick={()=>setView('menu')} className="bg-slate-700 px-6 py-3 rounded-xl font-semibold w-full">← Voltar</button>
-</div>
-<div className="mt-6 p-4 bg-slate-800/50 rounded-xl">
-<h3 className="font-bold text-sm mb-2 text-cyan-300">💡 Como obter:</h3>
-<ol className="text-xs text-slate-400 space-y-1">
-<li>1. Acesse makersuite.google.com/app/apikey</li>
-<li>2. Login com Google</li>
-<li>3. Clique "Create API key"</li>
-<li>4. Copie e cole aqui</li>
-</ol>
-</div>
-</div>
-</div>
-)
-
 if(view==="menu")return(
 <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-4">
 <div className="sound-control bg-slate-800/80 p-3 rounded-full cursor-pointer" onClick={()=>setSoundEnabled(!soundEnabled)}>
 {soundEnabled?'🔊':'🔇'}
 </div>
 <h1 className="text-6xl font-bold glow-text mb-4">EspiriQuiz</h1>
-<p className="text-purple-300">v3.2 Complete + IA</p>
+<p className="text-purple-300">v3.2 Final</p>
 
 <div className="bg-slate-800/50 p-4 rounded-xl max-w-md w-full">
 <div className="flex items-center justify-between mb-2">
@@ -414,15 +372,21 @@ return(
 <option value="Todos">Todos os Capítulos</option>
 <option value="Capítulo I">Capítulo I - De Deus</option>
 <option value="Capítulo II">Capítulo II - Dos Espíritos</option>
+<option value="Capítulo III">Capítulo III - Lei Divina</option>
+<option value="Capítulo IV">Capítulo IV - Lei de Adoração</option>
+<option value="Capítulo V">Capítulo V - Lei do Trabalho</option>
+<option value="Capítulo VI">Capítulo VI - Lei de Reprodução</option>
+<option value="Capítulo VII">Capítulo VII - Lei de Conservação</option>
+<option value="Capítulo VIII">Capítulo VIII - Lei de Destruição</option>
+<option value="Capítulo IX">Capítulo IX - Lei de Sociedade</option>
 </select>
 
-<p className="text-slate-400 text-sm">{bank.length} questões • {apiKey?'IA ✓':'IA ✗'}</p>
+<p className="text-slate-400 text-sm">{bank.length} questões disponíveis</p>
 
 <div className="flex flex-wrap gap-3 max-w-md">
 <button className="btn-primary px-8 py-4 rounded-2xl font-semibold flex-1 min-w-[200px]" onClick={()=>start('normal')}>▶ Jogar</button>
 <button className="bg-orange-600 px-6 py-4 rounded-2xl font-semibold" onClick={()=>start('blitz')}>⚡ Blitz</button>
 <button className="bg-slate-700 px-6 py-4 rounded-2xl font-semibold" onClick={()=>setView('dashboard')}>📊 Dashboard</button>
-<button className="bg-purple-700 px-6 py-4 rounded-2xl font-semibold" onClick={()=>setView('settings')}>⚙️ IA Config</button>
 </div>
 
 <div className="text-slate-500 text-xs mt-4">Desenvolvido com 💜 por <span className="text-purple-400">Alessandro M. Barreto</span></div>
@@ -456,9 +420,9 @@ return(
 )}
 
 {aiMentorTip&&(
-<div className="ai-message text-sm">
-<div className="font-semibold text-cyan-300 mb-2">🧠 Mentor:</div>
-<div className="text-slate-200">{aiMentorTip}</div>
+<div className="ai-message text-sm mb-4">
+<div className="font-semibold text-cyan-300 mb-2">🧠 Mentor Espiritual:</div>
+<div className="text-slate-200 whitespace-pre-line">{aiMentorTip}</div>
 </div>
 )}
 
@@ -474,7 +438,7 @@ return(
 <p className="text-lg leading-relaxed">{q.question}</p>
 </div>
 
-<div className="space-y-3">
+<div className="space-y-3 mb-4">
 {q.options.map((opt,i)=>{
 const isSelected=selectedAnswer===i
 const isCorrect=i===q.correct
@@ -497,21 +461,23 @@ return(
 })}
 </div>
 
-{feedback!==null&&studyMode&&!feedback&&(
-<button className="btn-primary px-6 py-3 rounded-xl font-semibold w-full mt-4" onClick={next}>➡️ Próxima</button>
-)}
-
 {feedback===true&&!aiDeepDive&&(
-<button onClick={generateDeepDive} disabled={loadingAI} className="btn-success px-4 py-2 rounded-xl text-sm font-semibold w-full disabled:opacity-50 mt-4">
-{loadingAI?<span className="loading-dots">Gerando</span>:'📚 Aprofundamento (IA)'}
+<button onClick={generateDeepDive} disabled={loadingAI} className="btn-success px-4 py-2 rounded-xl text-sm font-semibold w-full disabled:opacity-50 mb-3">
+{loadingAI?<span className="loading-dots">Gerando explicação</span>:'📚 Aprofundamento Doutrinário (IA)'}
 </button>
 )}
 
 {aiDeepDive&&(
-<div className="ai-message text-sm mt-4">
-<div className="font-semibold text-green-300 mb-2">📚 Aprofundamento:</div>
-<div className="text-slate-200">{aiDeepDive}</div>
+<div className="ai-message text-sm mb-3">
+<div className="font-semibold text-green-300 mb-2">📚 Aprofundamento Doutrinário:</div>
+<div className="text-slate-200 whitespace-pre-line">{aiDeepDive}</div>
 </div>
+)}
+
+{feedback!==null&&(
+<button className="btn-primary px-6 py-4 rounded-xl font-semibold w-full text-lg" onClick={next}>
+{feedback?'➡️ Próxima Pergunta':'➡️ Continuar'}
+</button>
 )}
 </div>
 </div>
