@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>EspiriQuiz v3.2 Fixed</title>
+<title>EspiriQuiz v3.2 Perfect</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -45,7 +45,7 @@ body{background:radial-gradient(circle at top,#1a1a2e,#0f0f1e,#000);color:#e2e8f
 const {useState,useEffect,useRef}=React
 
 // ========== CONFIGURE SUA CHAVE API AQUI ==========
-const GEMINI_API_KEY = 'AIzaSyD7Y1643CJQ-h0iMj1_MJ6JLeBXVqXtnhg'
+const GEMINI_API_KEY = 'SUA_CHAVE_API_AQUI'
 // Obtenha em: https://makersuite.google.com/app/apikey
 // ===================================================
 
@@ -71,6 +71,15 @@ const BADGES=[
 {id:'blitz',name:'Rei do Blitz',icon:'👑',desc:'Vença Blitz'}
 ]
 
+function shuffleArray(array){
+const arr=[...array]
+for(let i=arr.length-1;i>0;i--){
+const j=Math.floor(Math.random()*(i+1));
+[arr[i],arr[j]]=[arr[j],arr[i]]
+}
+return arr
+}
+
 function App(){
 const[bank,setBank]=useState([])
 const[questions,setQuestions]=useState([])
@@ -92,14 +101,17 @@ const[lastLogin,setLastLogin]=useState(null)
 const[badges,setBadges]=useState([])
 const[missions,setMissions]=useState([])
 const[blitzMode,setBlitzMode]=useState(false)
-const[blitzTimer,setBlitzTimer]=useState(10)
+const[blitzTimer,setBlitzTimer]=useState(15)
 
 const[aiMentorTip,setAiMentorTip]=useState(null)
 const[aiDeepDive,setAiDeepDive]=useState(null)
 const[loadingAI,setLoadingAI]=useState(false)
 
 useEffect(()=>{
-fetch("questions_complete.json").then(r=>r.json()).then(setBank)
+fetch("questions_complete.json").then(r=>r.json()).then(data=>{
+setBank(data)
+}).catch(err=>console.error("Erro ao carregar perguntas:",err))
+
 const saved=localStorage.getItem('espiriquiz-game')
 if(saved){
 const data=JSON.parse(saved)
@@ -117,7 +129,7 @@ useEffect(()=>{
 if(!blitzMode||view!=='game'||selectedAnswer!==null)return
 const t=setInterval(()=>{
 setBlitzTimer(prev=>{
-if(prev<=1){answer(-1);return 10}
+if(prev<=1){answer(-1);return 15}
 return prev-1
 })
 },1000)
@@ -129,55 +141,46 @@ if(GEMINI_API_KEY==='SUA_CHAVE_API_AQUI'){
 return "⚠️ Configure a chave API no código HTML (linha 45).\n\nObtenha grátis em: https://makersuite.google.com/app/apikey"
 }
 try{
-const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,{
+const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,{
 method:'POST',
 headers:{'Content-Type':'application/json'},
 body:JSON.stringify({
 contents:[{
 parts:[{text:prompt}]
-}],
-generationConfig:{
-temperature:0.7,
-topK:40,
-topP:0.95,
-maxOutputTokens:1024
-},
-safetySettings:[
-{category:"HARM_CATEGORY_HARASSMENT",threshold:"BLOCK_MEDIUM_AND_ABOVE"},
-{category:"HARM_CATEGORY_HATE_SPEECH",threshold:"BLOCK_MEDIUM_AND_ABOVE"},
-{category:"HARM_CATEGORY_SEXUALLY_EXPLICIT",threshold:"BLOCK_MEDIUM_AND_ABOVE"},
-{category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_MEDIUM_AND_ABOVE"}
-]
+}]
 })
 })
 
 if(!response.ok){
-const errorData=await response.json()
+const errorData=await response.json().catch(()=>({error:{message:'Erro desconhecido'}}))
 console.error('Erro API:',errorData)
 if(response.status===404){
-return "❌ Erro 404: Verifique se sua chave API está correta e ativa.\n\nGere uma nova em: https://makersuite.google.com/app/apikey"
+return "❌ Erro 404: Modelo não encontrado.\n\nSua chave pode estar inválida ou expirada.\nGere uma nova em: https://makersuite.google.com/app/apikey"
 }
 if(response.status===429){
-return "⏳ Limite de requisições excedido. Aguarde alguns minutos."
+return "⏳ Limite de requisições excedido.\n\nAguarde alguns minutos ou verifique sua quota em:\nconsole.cloud.google.com"
 }
-return `❌ Erro ${response.status}: ${errorData.error?.message||'Erro desconhecido'}`
+if(response.status===400){
+return "❌ Erro 400: Requisição inválida.\n\nVerifique se sua chave está ativa."
+}
+return `❌ Erro ${response.status}: ${errorData.error?.message||'Erro ao conectar com IA'}`
 }
 
 const data=await response.json()
 
-if(data.candidates&&data.candidates[0]&&data.candidates[0].content){
+if(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts){
 return data.candidates[0].content.parts[0].text
 }
 
 if(data.promptFeedback?.blockReason){
-return "⚠️ Resposta bloqueada por filtros de segurança. Tente outra pergunta."
+return "⚠️ Resposta bloqueada por filtros de segurança.\n\nTente reformular a pergunta."
 }
 
-return "Erro ao processar resposta da IA."
+return "❌ Não foi possível gerar resposta.\n\nTente novamente."
 
 }catch(error){
 console.error('Erro Gemini:',error)
-return `❌ Erro de conexão: ${error.message}\n\nVerifique:\n1. Conexão com internet\n2. Chave API configurada\n3. Firewall/antivírus`
+return `❌ Erro de conexão: ${error.message}\n\nVerifique:\n• Conexão com internet\n• Chave API configurada (linha 45)\n• Firewall/antivírus`
 }
 }
 
@@ -285,7 +288,19 @@ alert('⚠️ Nenhuma pergunta encontrada para este capítulo!')
 filtered=bank
 }
 const num=mode==='blitz'?20:difficulty==="easy"?10:difficulty==="hard"?20:15
-const sel=[...filtered].sort(()=>Math.random()-.5).slice(0,Math.min(num,filtered.length))
+let sel=[...filtered].sort(()=>Math.random()-.5).slice(0,Math.min(num,filtered.length))
+
+sel=sel.map(q=>{
+const correctAnswer=q.options[q.correct]
+const shuffledOptions=shuffleArray(q.options)
+const newCorrectIndex=shuffledOptions.indexOf(correctAnswer)
+return{
+...q,
+options:shuffledOptions,
+correct:newCorrectIndex
+}
+})
+
 setQuestions(sel)
 setIdx(0)
 setScore(0)
@@ -295,6 +310,7 @@ setBlitzMode(mode==='blitz')
 setStudyMode(mode==='study')
 setAiMentorTip(null)
 setAiDeepDive(null)
+setBlitzTimer(15)
 }
 
 function answer(i){
@@ -317,7 +333,7 @@ setTimeout(endGame,2000)
 function next(){
 setFeedback(null)
 setSelectedAnswer(null)
-setBlitzTimer(10)
+setBlitzTimer(15)
 setAiMentorTip(null)
 setAiDeepDive(null)
 if(idx+1>=questions.length){
@@ -332,7 +348,7 @@ if(victory){
 gainXP(200)
 unlockBadge('first')
 const maxScore=questions.length*(difficulty==="easy"?500:difficulty==="hard"?2000:1000)
-if(score===maxScore){unlockBadge('perfect');gainXP(500)}
+if(score>=maxScore-100){unlockBadge('perfect');gainXP(500)}
 const time=(Date.now()-startTime)/60000
 if(time<3)unlockBadge('speed')
 if(blitzMode)unlockBadge('blitz')
@@ -348,7 +364,7 @@ if(view==="menu")return(
 {soundEnabled?'🔊':'🔇'}
 </div>
 <h1 className="text-6xl font-bold glow-text mb-4">EspiriQuiz</h1>
-<p className="text-purple-300">v3.2 Fixed - API Gemini Corrigida</p>
+<p className="text-purple-300">v3.2 Perfect - Todas Correções</p>
 
 <div className="bg-slate-800/50 p-4 rounded-xl max-w-md w-full">
 <div className="flex items-center justify-between mb-2">
@@ -431,11 +447,11 @@ return(
 <option value="Capítulo IX">Capítulo IX - Lei de Sociedade</option>
 </select>
 
-<p className="text-slate-400 text-sm">{bank.length} questões disponíveis</p>
+<p className="text-slate-400 text-sm">{bank.length} questões • Blitz: 15s por pergunta</p>
 
 <div className="flex flex-wrap gap-3 max-w-md">
 <button className="btn-primary px-8 py-4 rounded-2xl font-semibold flex-1 min-w-[200px]" onClick={()=>start('normal')}>▶ Jogar</button>
-<button className="bg-orange-600 px-6 py-4 rounded-2xl font-semibold" onClick={()=>start('blitz')}>⚡ Blitz</button>
+<button className="bg-orange-600 px-6 py-4 rounded-2xl font-semibold" onClick={()=>start('blitz')}>⚡ Blitz (15s)</button>
 <button className="bg-slate-700 px-6 py-4 rounded-2xl font-semibold" onClick={()=>setView('dashboard')}>📊 Dashboard</button>
 </div>
 
@@ -451,7 +467,11 @@ return(
 <div className="sound-control bg-slate-800/80 p-3 rounded-full cursor-pointer" onClick={()=>setSoundEnabled(!soundEnabled)}>
 {soundEnabled?'🔊':'🔇'}
 </div>
-<button className="exit-button bg-red-600/80 px-4 py-2 rounded-full font-semibold" onClick={()=>setView("menu")}>← Sair</button>
+<button className="exit-button bg-red-600/80 px-4 py-2 rounded-full font-semibold" onClick={()=>{
+if(confirm('Deseja realmente sair? Seu progresso será perdido.')){
+setView("menu")
+}
+}}>← Sair</button>
 
 <div className="max-w-2xl w-full">
 <div className="flex justify-between items-center mb-2">
@@ -478,7 +498,7 @@ return(
 
 {blitzMode&&(
 <div className="text-center mb-4">
-<div className={`blitz-timer ${blitzTimer<=3?'blitz-urgent':''}`}>{blitzTimer}</div>
+<div className={`blitz-timer ${blitzTimer<=5?'blitz-urgent':''}`}>{blitzTimer}</div>
 <div className="text-sm text-slate-400">segundos</div>
 </div>
 )}
@@ -544,7 +564,7 @@ if(view==="dashboard")return(
 <div className="flex items-end gap-2 h-40">
 {[100,300,600,1200,2000,xp].map((val,i)=>(
 <div key={i} className="flex-1 flex flex-col justify-end">
-<div className="bg-gradient-to-t from-purple-600 to-pink-600 rounded-t transition-all" style={{height:`${(val/3000)*100}%`}}/>
+<div className="bg-gradient-to-t from-purple-600 to-pink-600 rounded-t transition-all" style={{height:`${Math.min((val/3000)*100,100)}%`}}/>
 <div className="text-xs text-center mt-1">{i+1}</div>
 </div>
 ))}
